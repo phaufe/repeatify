@@ -1,10 +1,12 @@
 @interface NSArray (JiangFoundation)
 
+/* Override behavior */
+
+- (NSString *)description;
+
 /* Additional behavior */
 
 - (void)each:(void (^)(id))block;
-- (NSString *)join:(NSString *)sep;
-- (NSString *)toString;
 
 /* Functional programming */
 
@@ -15,5 +17,6 @@
 /* Syntax suger */
 
 - (NSArray *)reverse;
+- (NSString *)join:(NSString *)sep;
 
 @end

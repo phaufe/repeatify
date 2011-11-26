@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string>Spotify</string>
+	<string>libspotify</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.spotify.Core</string>
 	<key>CFBundleInfoDictionaryVersion</key>
