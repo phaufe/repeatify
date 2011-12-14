@@ -616,8 +616,8 @@
 -(void)session:(SPSession *)aSession didFailToLoginWithError:(NSError *)error {
     _loginStatus = RPLoginStatusNoUser;
     [self.loginStatusField setStringValue:@""];
-    if (error.code == SP_ERROR_USER_BANNED) {
-        [[NSApplication sharedApplication] presentError:[NSError spotifyErrorWithDescription:@"Please upgrade to Spotify Premium account"]];
+    if (error.code == SP_ERROR_USER_NEEDS_PREMIUM) {
+        [[NSApplication sharedApplication] presentError:[NSError spotifyErrorWithDescription:@"According to Spotify's terms of use, to run third-party apps, a Premium account is required. Thanks for your interest in Repeatify. Please upgrade to Spotify Premium account."]];
     }
     else {
         [[NSApplication sharedApplication] presentError:error];
