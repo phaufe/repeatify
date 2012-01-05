@@ -100,8 +100,8 @@
         }
         
         if ([self getCurrentRepeatMode] != RPRepeatOne && [[NSUserDefaults standardUserDefaults] boolForKey:@"RPGrowlNotification"]) {
-            [GrowlApplicationBridge notifyWithTitle:((SPArtist *)[track.artists objectAtIndex:0]).name
-                                        description:track.name
+            [GrowlApplicationBridge notifyWithTitle:track.name
+                                        description:((SPArtist *)[track.artists objectAtIndex:0]).name
                                    notificationName:@"PlayTrack"
                                            iconData:nil
                                            priority:0
