@@ -345,11 +345,9 @@
     self.loginStatus = RPLoginStatusNoUser;
     [self.loginStatusField setStringValue:@""];
     if (error.code == SP_ERROR_USER_NEEDS_PREMIUM) {
-        [[NSApplication sharedApplication] presentError:[NSError spotifyErrorWithDescription:@"According to Spotify's terms of use, to run third-party apps, a Premium account is required. Thanks for your interest in Repeatify. Please upgrade to Spotify Premium account."]];
+        error = [NSError spotifyErrorWithDescription:@"According to Spotify's terms of use, to run third-party apps, a Premium account is required. Thanks for your interest in Repeatify. Please upgrade to Spotify Premium account."];
     }
-    else {
-        [[NSApplication sharedApplication] presentError:error];
-    }
+    [[NSApplication sharedApplication] presentError:error];
     [self.passwordField becomeFirstResponder];
     
     [self.loginProgressIndicator setHidden:YES];
