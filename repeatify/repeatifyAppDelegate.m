@@ -51,38 +51,12 @@
 
 @interface repeatifyAppDelegate()
 
-- (void)switchToRepeatOneMode;
-- (void)switchToRepeatAllMode;
-- (void)switchToRepeatShuffleMode;
 - (void)toggleShowGrowlNotification;
 
-- (void)handlePlaylistFolder:(SPPlaylistFolder *)folder menuItem:(NSMenuItem *)menuItem;
-- (void)handlePlaylist:(SPPlaylist *)list menuItem:(NSMenuItem *)menuItem;
-- (void)handleTopList:(NSMenu *)menu;
-- (void)handleInboxPlaylist:(NSMenu *)menu;
-- (void)handleStarredPlaylist:(NSMenu *)menu;
-- (void)handleNowPlayingView:(NSMenu *)menu;
-- (void)handlePlaybackMenuItem:(NSMenu *)menu;
-
-- (NSArray *)getTracksFromPlaylistItems:(NSArray *)playlistItems;
-- (void)addTracks:(NSArray *)tracks toMenuItem:(NSMenuItem *)menuItem;
-
-- (void)togglePlayNext:(id)sender;
-- (void)togglePlayPrevious:(id)sender;
-
-- (void)updateMenu;
-- (void)clickTrackMenuItem:(id)sender;
-- (void)updateAlbumCoverImage:(id)sender;
-- (void)updateNowPlayingTrackInformation:(id)sender;
-- (void)updateIsPlayingStatus:(id)sender;
-
-- (void)showLoginDialog;
 - (void)afterLoggedIn;
 - (void)didLoggedIn;
-- (void)logoutUser;
 
-- (void)showAboutPanel;
-- (void)quitRepeatify;
+- (void)updateMenus;
 
 @end
 
@@ -90,7 +64,7 @@
 
 @synthesize nowPlayingView, nowPlayingAlbumCoverImageView, nowPlayingTrackNameLabel, nowPlayingArtistNameLabel, nowPlayingControllerButton, volumeControlView, volumeControlSlider;
 @synthesize loginDialog, usernameField, passwordField, loginProgressIndicator, loginStatusField, saveCredentialsButton;
-
+@synthesize playbackManager, loginStatus, topList;
 
 #pragma mark -
 #pragma mark Application Lifecycle
@@ -118,7 +92,7 @@
     }
     else {
         [self showLoginDialog];
-        _loginStatus = RPLoginStatusNoUser;
+        self.loginStatus = RPLoginStatusNoUser;
     }
     
     [[SPSession sharedSession] setDelegate:self];
@@ -133,8 +107,13 @@
 	NSLog(@"Could not load Growl.framework");
     }
 
-    _playbackManager = [[RPPlaybackManager alloc] initWithPlaybackSession:[SPSession sharedSession]];    
-    _topList = nil;
+    _playlistMenuDelegate = [RPPlaylistMenuDelegate new];
+    _playlistMenuDelegate.delegate = self;
+    _statusMenu = [[NSMenu alloc] initWithTitle:@"Status Menu"];
+    [_statusMenu setDelegate:_playlistMenuDelegate];
+    
+    self.playbackManager = [[RPPlaybackManager alloc] initWithPlaybackSession:[SPSession sharedSession]];
+    self.topList = nil;
     _mediaKeyTap = [[SPMediaKeyTap alloc] initWithDelegate:self];
     if([SPMediaKeyTap usesGlobalMediaKeyTap]) {
         [_mediaKeyTap startWatchingMediaKeys];
@@ -150,10 +129,6 @@
     [_statusItem setImage:statusBarIcon];
     [_statusItem setHighlightMode:YES];
     [_statusItem setTarget:self];
-    
-    _statusMenu = [[NSMenu alloc] initWithTitle:@"Status Menu"];
-    [_statusMenu setDelegate:self];
-    
     [_statusItem setMenu:_statusMenu];
 }
 
@@ -169,14 +144,18 @@
 - (void)dealloc {
     [_statusMenu release];
     [_statusItem release];
-    [_playbackManager release];
     [_mediaKeyTap release];
-    if (_topList != nil) {
-        [_topList release];
-        _topList = nil;
+    if (self.topList != nil) {
+        [self.topList release];
+        self.topList = nil;
     }
+    [self.playbackManager release];
     
     [super dealloc];
+}
+
+- (void)updateMenus {
+    [_playlistMenuDelegate updateMenu:_statusMenu];
 }
 
 
@@ -187,186 +166,30 @@
     [[NSApplication sharedApplication] orderFrontStandardAboutPanel:nil];
 }
 
-
 - (void)quitRepeatify {
     [NSApp terminate:self];
-}
-
-
-#pragma mark -
-#pragma mark Playlist Menu Items
-
-- (void)updateMenu {
-    [_statusMenu removeAllItems];
-    
-    [self handleNowPlayingView:_statusMenu];
-    [self handlePlaybackMenuItem:_statusMenu];
-    
-    SPUser *user = [[SPSession sharedSession] user];
-    
-    SPPlaylistContainer *container = [[SPSession sharedSession] userPlaylists];
-    if (_loginStatus == RPLoginStatusLogging) {
-        [_statusMenu addItemWithTitle:@"Logging In..." action:nil keyEquivalent:@""];
-    }
-    if (_loginStatus == RPLoginStatusLoadingPlaylist) {
-        [_statusMenu addItemWithTitle:@"Loading Playlist..." action:nil keyEquivalent:@""];
-    }
-    if (_loginStatus == RPLoginStatusLoggedIn && container != nil) {
-        NSArray *playlists = container.playlists;
-        if ([playlists count] == 0) {
-            [_statusMenu addItemWithTitle:@"No Playlist Found" action:nil keyEquivalent:@""];
-        }
-        [playlists each:^(id playlist) {
-            NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
-            
-            if ([playlist isKindOfClass:[SPPlaylistFolder class]]) {
-                [self handlePlaylistFolder:playlist menuItem:innerMenuItem];
-            }
-            else if ([playlist isKindOfClass:[SPPlaylist class]]) {
-                [self handlePlaylist:playlist menuItem:innerMenuItem];
-            }
-            
-            [_statusMenu addItem:innerMenuItem];
-            [innerMenuItem release];
-        }];
-        
-        [_statusMenu addItem:[NSMenuItem separatorItem]];
-        [self handleStarredPlaylist:_statusMenu];
-        [self handleInboxPlaylist:_statusMenu];
-        [self handleTopList:_statusMenu];
-    }
-    
-    if (_loginStatus != RPLoginStatusNoUser) {
-        [_statusMenu addItem:[NSMenuItem separatorItem]];
-    }
-    
-    if (user == nil) {
-        [_statusMenu addItemWithTitle:@"Login" action:@selector(showLoginDialog) keyEquivalent:@""];
-    }
-    else {
-        [_statusMenu addItemWithTitle:[NSString stringWithFormat:@"Log Out %@", user.displayName] action:@selector(logoutUser) keyEquivalent:@""];
-    }
-    [_statusMenu addItemWithTitle:@"About Repeatify" action:@selector(showAboutPanel) keyEquivalent:@""];
-    [_statusMenu addItemWithTitle:@"Quit" action:@selector(quitRepeatify) keyEquivalent:@""];
-}
-
-- (void)handleStarredPlaylist:(NSMenu *)menu {
-    NSMenuItem *starredPlaylistItem = [[NSMenuItem alloc] init];
-    [self handlePlaylist:[[SPSession sharedSession] starredPlaylist] menuItem:starredPlaylistItem];
-    [starredPlaylistItem setTitle:@"Starred"];
-    [menu addItem:starredPlaylistItem];
-    [starredPlaylistItem release];    
-}
-
-- (void)handleInboxPlaylist:(NSMenu *)menu {
-    NSMenuItem *inboxPlaylistItem = [[NSMenuItem alloc] init];
-    [self handlePlaylist:[[SPSession sharedSession] inboxPlaylist] menuItem:inboxPlaylistItem];
-    [inboxPlaylistItem setTitle:@"Inbox"];
-    [menu addItem:inboxPlaylistItem];
-    [inboxPlaylistItem release];
-}
-
-- (void)handleTopList:(NSMenu *)menu {
-    if (_topList.isLoaded) {
-        [menu addItem:[NSMenuItem separatorItem]];
-        
-        NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
-        [innerMenuItem setTitle:@"What's Hot"];
-        [self addTracks:_topList.tracks toMenuItem:innerMenuItem];
-        [menu addItem:innerMenuItem];
-        [innerMenuItem release];
-    }
-}
-
-- (void)handlePlaylistFolder:(SPPlaylistFolder *)folder menuItem:(NSMenuItem *)menuItem {
-    [menuItem setTitle:folder.name];
-    NSMenu *innerMenu = [[NSMenu alloc] init];
-    [folder.playlists each:^(id playlist) {
-        NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
-        
-        if ([playlist isKindOfClass:[SPPlaylistFolder class]]) {
-            [self handlePlaylistFolder:playlist menuItem:innerMenuItem];
-        }
-        else if ([playlist isKindOfClass:[SPPlaylist class]]) {
-            [self handlePlaylist:playlist menuItem:innerMenuItem];
-        }
-        
-        [innerMenu addItem:innerMenuItem];
-        [innerMenuItem release];
-    }];
-    
-    [menuItem setSubmenu:innerMenu];
-    [innerMenu release];
-}
-
-- (void)handlePlaylist:(SPPlaylist *)list menuItem:(NSMenuItem *)menuItem {
-    [menuItem setTitle:list.name];
-    [self addTracks:[self getTracksFromPlaylistItems:list.items] toMenuItem:menuItem];
-}
-
-- (NSArray *)getTracksFromPlaylistItems:(NSArray *)playlistItems {
-    NSMutableArray *tracks = [[NSMutableArray alloc] init];
-    [playlistItems each:^(id item) {
-        SPTrack *track = nil;
-        if ([item isKindOfClass:[SPPlaylistItem class]]) {
-            SPPlaylistItem *playlistItem = (SPPlaylistItem *)item;
-            if ([playlistItem.item isKindOfClass:[SPTrack class]]) {
-                track = (SPTrack *)playlistItem.item;
-            }
-        }
-        if ([item isKindOfClass:[SPTrack class]]) {
-            track = (SPTrack *)item;
-        }
-        if (track != nil) {
-            [tracks addObject:track];
-        }
-    }];
-    return [tracks autorelease];
-}
-
-- (void)addTracks:(NSArray *)tracks toMenuItem:(NSMenuItem *)menuItem {
-    NSMenu *innerMenu = [[NSMenu alloc] init];
-    [tracks each:^(SPTrack *track) {
-        if (track != nil) {
-            NSMenuItem *innerMenuItem;
-            if (track.name == nil) {
-                innerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Loading Track..." action:nil keyEquivalent:@""];
-            }
-            else {
-                if (track.availability == SP_TRACK_AVAILABILITY_AVAILABLE) {
-                    innerMenuItem = [[NSMenuItem alloc] initWithTitle:track.name action:@selector(clickTrackMenuItem:) keyEquivalent:@""];
-                    
-                    if ([track isEqualTo:_playbackManager.currentTrack]) {
-                        [innerMenuItem setState:NSOnState];
-                    }
-                    else {
-                        [innerMenuItem setState:NSOffState];
-                    }
-                }
-                else {
-                    innerMenuItem = [[NSMenuItem alloc] initWithTitle:track.name action:nil keyEquivalent:@""];
-                }
-            }
-            [innerMenuItem setRepresentedObject:[NSArray arrayWithObjects:track, tracks, nil]];
-            [innerMenu addItem:innerMenuItem];
-            [innerMenuItem release];
-        }
-    }];
-    [menuItem setSubmenu:innerMenu];
-    [innerMenu release];
 }
 
 #pragma mark -
 #pragma mark Playback
 
+- (void)updateIsPlayingStatus:(id)sender {
+    if (self.playbackManager.isPlaying) {
+        self.nowPlayingControllerButton.image = [NSImage imageNamed:@"pause"];
+    }
+    else {
+        self.nowPlayingControllerButton.image = [NSImage imageNamed:@"play"];
+    }
+}
+
 - (void)clickTrackMenuItem:(id)sender {
     NSMenuItem *clickedMenuItem = (NSMenuItem *)sender;
     
-    [_playbackManager play:[[clickedMenuItem representedObject] objectAtIndex:0]];
+    [self.playbackManager play:[[clickedMenuItem representedObject] objectAtIndex:0]];
     NSArray *filteredPlaylist = [[[clickedMenuItem representedObject] objectAtIndex:1] select:^BOOL(SPTrack *track) {
         return track.availability == SP_TRACK_AVAILABILITY_AVAILABLE;
     }];
-    [_playbackManager setPlaylist:filteredPlaylist];
+    [self.playbackManager setPlaylist:filteredPlaylist];
 }
 
 - (void)updateAlbumCoverImage:(id)sender {
@@ -388,145 +211,36 @@
     }
 }
 
-- (void)updateNowPlayingTrackInformation:(id)sender {
-    SPTrack *track = _playbackManager.currentTrack;
-    [self.nowPlayingArtistNameLabel setStringValue:((SPArtist *)[track.artists objectAtIndex:0]).name];
-    [self.nowPlayingTrackNameLabel setStringValue:track.name];
-    SPImage *cover = track.album.cover;
-    if (cover.isLoaded) {
-        NSImage *coverImage = cover.image;
-        if (coverImage != nil) {
-            [self.nowPlayingAlbumCoverImageView setImage:coverImage];
-        }
-    }
-    else {
-        [self.nowPlayingAlbumCoverImageView setImage:[NSImage imageNamed:@"album-placeholder"]];
-        [cover beginLoading];
-        [self performSelector:@selector(updateAlbumCoverImage:) withObject:track afterDelay:0.5];
-    }
-    
-    [self updateIsPlayingStatus:self];
-}
-
-- (void)updateIsPlayingStatus:(id)sender {
-    if (_playbackManager.isPlaying) {
-        self.nowPlayingControllerButton.image = [NSImage imageNamed:@"pause"];
-    }
-    else {
-        self.nowPlayingControllerButton.image = [NSImage imageNamed:@"play"];
-    }
-}
-
-- (void)handleNowPlayingView:(NSMenu *)menu {
-    if (_playbackManager.currentTrack != nil) {
-        [self updateNowPlayingTrackInformation:self];
-        NSMenuItem *nowPlayingMenuItem = [[NSMenuItem alloc] init];
-        nowPlayingMenuItem.view = self.nowPlayingView;
-        [menu addItem:nowPlayingMenuItem];
-        [nowPlayingMenuItem release];
-        
-        [menu addItem:[NSMenuItem separatorItem]];
-    }
-}
-
-- (void)handlePlaybackMenuItem:(NSMenu *)menu {
-    if (_playbackManager.currentTrack != nil) {
-        NSMenuItem *playbackMenuItem = [[NSMenuItem alloc] initWithTitle:@"Playback" action:nil keyEquivalent:@""];
-        NSMenu *playbackControlMenu = [[NSMenu alloc] init];
-        
-        NSMenuItem *playQueueMenuItem = [[NSMenuItem alloc] init];
-        [playQueueMenuItem setTitle:@"Play Queue"];
-        [self addTracks:[_playbackManager getCurrentPlayQueue] toMenuItem:playQueueMenuItem];
-        [playbackControlMenu addItem:playQueueMenuItem];
-        [playQueueMenuItem release];
-        
-        [playbackControlMenu addItemWithTitle:@"" action:nil keyEquivalent:@""];
-        [playbackControlMenu addItemWithTitle:@"Play/Pause" action:@selector(togglePlayController:) keyEquivalent:@""];
-        [playbackControlMenu addItem:[NSMenuItem separatorItem]];
-        
-        [playbackControlMenu addItemWithTitle:@"Next" action:@selector(togglePlayNext:) keyEquivalent:@""];
-        [playbackControlMenu addItemWithTitle:@"Previous" action:@selector(togglePlayPrevious:) keyEquivalent:@""];
-        [playbackControlMenu addItem:[NSMenuItem separatorItem]];
-        
-        NSMenuItem *repeatOneMenuItem = [[NSMenuItem alloc] initWithTitle:@"Repeat One" action:@selector(switchToRepeatOneMode) keyEquivalent:@""];
-        NSMenuItem *repeatAllMenuItem = [[NSMenuItem alloc] initWithTitle:@"Repeat All" action:@selector(switchToRepeatAllMode) keyEquivalent:@""];
-        NSMenuItem *repeatShuffleMenuItem = [[NSMenuItem alloc] initWithTitle:@"Repeat Shuffle" action:@selector(switchToRepeatShuffleMode) keyEquivalent:@""];
-        
-        switch ([_playbackManager getCurrentRepeatMode]) {
-            case RPRepeatOne:
-                [repeatOneMenuItem setState:NSOnState];
-                break;
-            case RPRepeatAll:
-                [repeatAllMenuItem setState:NSOnState];
-                break;
-            case RPRepeatShuffle:
-                [repeatShuffleMenuItem setState:NSOnState];
-                break;
-            default:
-                break;
-        }
-        
-        [playbackControlMenu addItem:repeatOneMenuItem];
-        [playbackControlMenu addItem:repeatAllMenuItem];
-        [playbackControlMenu addItem:repeatShuffleMenuItem];
-        [repeatOneMenuItem release];
-        [repeatAllMenuItem release];
-        [repeatShuffleMenuItem release];
-        [playbackControlMenu addItem:[NSMenuItem separatorItem]];
-        
-        NSMenuItem *volumeControlMenuItem = [[NSMenuItem alloc] init];
-        volumeControlMenuItem.view = self.volumeControlView;
-        [playbackControlMenu addItem:volumeControlMenuItem];
-        [volumeControlMenuItem release];
-        [playbackControlMenu addItem:[NSMenuItem separatorItem]];
-        
-        NSMenuItem *showGrowlNotificationMenuItem = [[NSMenuItem alloc] initWithTitle:@"Show Notification" action:@selector(toggleShowGrowlNotification) keyEquivalent:@""];
-        if ([[NSUserDefaults standardUserDefaults] boolForKey:@"RPGrowlNotification"]) {
-            [showGrowlNotificationMenuItem setState:NSOnState];
-        }
-        [playbackControlMenu addItem:showGrowlNotificationMenuItem];
-        [showGrowlNotificationMenuItem release];
-        
-        [playbackMenuItem setSubmenu:playbackControlMenu];
-        [menu addItem:playbackMenuItem];
-        
-        [playbackControlMenu release];
-        [playbackMenuItem release];
-        
-        [menu addItem:[NSMenuItem separatorItem]];
-    }
-}
-
 - (IBAction)togglePlayController:(id)sender {
-    if (_playbackManager.currentTrack != nil) {
-        _playbackManager.isPlaying = !_playbackManager.isPlaying;
+    if (self.playbackManager.currentTrack != nil) {
+        self.playbackManager.isPlaying = !self.playbackManager.isPlaying;
         [self updateIsPlayingStatus:self];
     }
 }
 
 - (void)togglePlayNext:(id)sender {
-    [_playbackManager next];
-    [self updateMenu];
+    [self.playbackManager next];
+    [self updateMenus];
 }
 
 - (void)togglePlayPrevious:(id)sender {
-    [_playbackManager previous];
-    [self updateMenu];
+    [self.playbackManager previous];
+    [self updateMenus];
 }
 
 #pragma mark -
 #pragma mark Playback Management
 
 - (void)switchToRepeatOneMode {
-    [_playbackManager toggleRepeatOneMode];
+    [self.playbackManager toggleRepeatOneMode];
 }
 
 - (void)switchToRepeatAllMode {
-    [_playbackManager toggleRepeatAllMode];
+    [self.playbackManager toggleRepeatAllMode];
 }
 
 - (void)switchToRepeatShuffleMode {
-    [_playbackManager toggleRepeatShuffleMode];
+    [self.playbackManager toggleRepeatShuffleMode];
 }
 
 #pragma mark -
@@ -542,15 +256,7 @@
 
 - (IBAction)volumeChanged:(id)sender {
     NSSlider *volumeSlider = (NSSlider *)sender;
-    _playbackManager.volume = volumeSlider.doubleValue;
-}
-
-
-#pragma mark -
-#pragma mark NSMenuDelegate Methods
-
-- (void)menuNeedsUpdate:(NSMenu *)menu {
-    [self updateMenu];
+    self.playbackManager.volume = volumeSlider.doubleValue;
 }
 
 #pragma mark -
@@ -567,7 +273,7 @@
                                         rememberCredentials:self.saveCredentialsButton.state];
         [self.loginProgressIndicator setHidden:NO];
         [self.loginProgressIndicator startAnimation:self];
-        _loginStatus = RPLoginStatusLogging;
+        self.loginStatus = RPLoginStatusLogging;
         [self.loginStatusField setStringValue:@"Logging In..."];
     }
     else {
@@ -576,7 +282,7 @@
 }
 
 - (void)showLoginDialog {
-    _loginStatus = RPLoginStatusNoUser;
+    self.loginStatus = RPLoginStatusNoUser;
     self.usernameField.stringValue = @"";
     self.passwordField.stringValue = @"";
     [self.loginDialog center];
@@ -587,8 +293,8 @@
 }
 
 - (void)afterLoggedIn {
-    _topList = [[SPToplist alloc] initLocaleToplistWithLocale:nil inSession:[SPSession sharedSession]];
-    _loginStatus = RPLoginStatusLoggedIn;
+    self.topList = [[SPToplist alloc] initLocaleToplistWithLocale:nil inSession:[SPSession sharedSession]];
+    self.loginStatus = RPLoginStatusLoggedIn;
 }
 
 - (void)didLoggedIn {
@@ -597,8 +303,8 @@
 }
 
 - (void)logoutUser {
-    _loginStatus = RPLoginStatusNoUser;
-    [_playbackManager playTrack:nil error:nil];
+    self.loginStatus = RPLoginStatusNoUser;
+    [self.playbackManager playTrack:nil error:nil];
     [[SPSession sharedSession] forgetStoredCredentials];
     [[SPSession sharedSession] logout];
     [self showLoginDialog];
@@ -608,13 +314,13 @@
 #pragma mark SPSessionDelegate Methods
 
 -(void)sessionDidLoginSuccessfully:(SPSession *)aSession {
-    _loginStatus = RPLoginStatusLoadingPlaylist;
+    self.loginStatus = RPLoginStatusLoadingPlaylist;
     [self.loginStatusField setStringValue:@"Loading Playlists..."];
     [self performSelector:@selector(didLoggedIn) withObject:nil afterDelay:5.0];
 }
 
 -(void)session:(SPSession *)aSession didFailToLoginWithError:(NSError *)error {
-    _loginStatus = RPLoginStatusNoUser;
+    self.loginStatus = RPLoginStatusNoUser;
     [self.loginStatusField setStringValue:@""];
     if (error.code == SP_ERROR_USER_NEEDS_PREMIUM) {
         [[NSApplication sharedApplication] presentError:[NSError spotifyErrorWithDescription:@"According to Spotify's terms of use, to run third-party apps, a Premium account is required. Thanks for your interest in Repeatify. Please upgrade to Spotify Premium account."]];

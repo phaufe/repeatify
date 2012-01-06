@@ -36,26 +36,18 @@
 #import <Cocoa/Cocoa.h>
 #import "RPPlaybackManager.h"
 #import "SPMediaKeyTap.h"
-
-typedef enum _RPLoginStatus {
-    RPLoginStatusNoUser,
-    RPLoginStatusLogging,
-    RPLoginStatusLoadingPlaylist,
-    RPLoginStatusLoggedIn
-} RPLoginStatus;
+#import "RPPlaylistMenuDelegate.h"
+#import "RPLoginStatus.h"
 
 @interface RPApplication : NSApplication
 @end
 
-@interface repeatifyAppDelegate : NSObject <NSApplicationDelegate, SPSessionDelegate, NSMenuDelegate, GrowlApplicationBridgeDelegate> {
+@interface repeatifyAppDelegate : NSObject <NSApplicationDelegate, SPSessionDelegate, GrowlApplicationBridgeDelegate> {
     NSStatusItem *_statusItem;
     NSMenu *_statusMenu;
+    RPPlaylistMenuDelegate *_playlistMenuDelegate;
     
     SPMediaKeyTap *_mediaKeyTap;
-    SPToplist *_topList;
-    RPPlaybackManager *_playbackManager;
-    
-    RPLoginStatus _loginStatus;
 }
 
 @property (nonatomic, retain) IBOutlet NSView *nowPlayingView;
@@ -73,9 +65,28 @@ typedef enum _RPLoginStatus {
 @property (nonatomic, retain) IBOutlet NSProgressIndicator *loginProgressIndicator;
 @property (nonatomic, retain) IBOutlet NSTextField *loginStatusField;
 
+@property (nonatomic, retain) SPToplist *topList;
+@property (nonatomic, retain) RPPlaybackManager *playbackManager;
+@property RPLoginStatus loginStatus;
+
 - (IBAction)togglePlayController:(id)sender;
 - (IBAction)volumeChanged:(id)sender;
 - (IBAction)closeLoginDialog:(id)sender;
 - (IBAction)clickLoginButton:(id)sender;
+
+- (void)updateIsPlayingStatus:(id)sender;
+- (void)updateAlbumCoverImage:(id)sender;
+
+- (void)switchToRepeatOneMode;
+- (void)switchToRepeatAllMode;
+- (void)switchToRepeatShuffleMode;
+
+- (void)togglePlayNext:(id)sender;
+- (void)togglePlayPrevious:(id)sender;
+
+- (void)showLoginDialog;
+- (void)logoutUser;
+- (void)showAboutPanel;
+- (void)quitRepeatify;
 
 @end
