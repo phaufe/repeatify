@@ -33,7 +33,7 @@
  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import "RPArrayUtil.h"
+#import "RPArrayHelper.h"
 
 NSArray *shuffleArray(NSArray *array) {
     NSMutableArray *mutableArray = [NSMutableArray arrayWithCapacity:[array count]];

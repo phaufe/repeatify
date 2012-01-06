@@ -34,7 +34,7 @@
  */
 
 #import "RPPlaybackManager.h"
-#import "RPArrayUtil.h"
+#import "RPArrayHelper.h"
 
 @interface SPPlaybackManager()
 
