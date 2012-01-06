@@ -219,19 +219,16 @@
 
 - (void)updateAlbumCoverImage:(id)sender {
     SPTrack *track = (SPTrack *)sender;
-    if (track != nil) {
-        if (track.isLoaded) {
-            SPImage *cover = track.album.cover;
-            if (cover.isLoaded) {
-                NSImage *coverImage = cover.image;
-                if (coverImage != nil) {
-                    [self.nowPlayingAlbumCoverImageView setImage:coverImage];
-                }
+    if (track != nil && track.isLoaded) {
+        SPImage *cover = track.album.cover;
+        if (cover.isLoaded) {
+            NSImage *coverImage = cover.image;
+            if (coverImage != nil) {
+                [self.nowPlayingAlbumCoverImageView setImage:coverImage];
             }
-            else {
-                [self performSelector:@selector(updateAlbumCoverImage:) withObject:track afterDelay:0.5];
-                return;
-            }
+        }
+        else {
+            [self performSelector:@selector(updateAlbumCoverImage:) withObject:track afterDelay:0.5];
         }
     }
 }
