@@ -35,8 +35,4 @@
 
 #import <Foundation/Foundation.h>
 
-@interface RPArrayUtil : NSObject
-
-+ (NSArray *)shuffle:(NSArray *)array;
-
-@end
+NSArray *shuffleArray(NSArray *array);

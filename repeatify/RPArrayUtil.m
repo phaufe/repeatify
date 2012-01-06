@@ -35,9 +35,7 @@
 
 #import "RPArrayUtil.h"
 
-@implementation RPArrayUtil
-
-+ (NSArray *)shuffle:(NSArray *)array {
+NSArray *shuffleArray(NSArray *array) {
     NSMutableArray *mutableArray = [NSMutableArray arrayWithCapacity:[array count]];
     
     for (id anObject in array) {
@@ -47,5 +45,3 @@
     
     return [NSArray arrayWithArray:mutableArray];
 }
-
-@end

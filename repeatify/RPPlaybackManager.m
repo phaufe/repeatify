@@ -184,7 +184,7 @@
 - (void)toggleRepeatShuffleMode {
     [self setCurrentRepeatifyMode:RPRepeatShuffle];
     
-    NSMutableArray *mutablePlaylist = [[RPArrayUtil shuffle:self.currentPlaylist] mutableCopy];
+    NSMutableArray *mutablePlaylist = [shuffleArray(self.currentPlaylist) mutableCopy];
     [mutablePlaylist removeObject:self.currentTrack];
     [mutablePlaylist insertObject:self.currentTrack atIndex:0];
     self.playQueue = mutablePlaylist;
