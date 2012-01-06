@@ -58,6 +58,12 @@
 
 - (void)updateMenus;
 
+- (void)setupGrowl;
+- (void)setupMenus;
+- (void)setupPlaylistMenu;
+- (void)setupMediaKeysListening;
+- (void)setupSystemStatusItem;
+
 @end
 
 @implementation repeatifyAppDelegate
@@ -85,6 +91,50 @@
                                                    error:nil];
 }
 
+- (void)setupGrowl {
+    NSBundle *currentBundle = [NSBundle bundleForClass:[repeatifyAppDelegate class]];
+    NSString *growlPath = [[currentBundle privateFrameworksPath]
+                           stringByAppendingPathComponent:@"Growl.framework"];
+    NSBundle *growlBundle = [NSBundle bundleWithPath:growlPath];
+    if (growlBundle && [growlBundle load]) {
+	[GrowlApplicationBridge setGrowlDelegate:self];
+    } else {
+	NSLog(@"Could not load Growl.framework");
+    }
+}
+
+- (void)setupMenus {
+    [self setupPlaylistMenu];
+}
+
+- (void)setupPlaylistMenu {
+    _playlistMenuDelegate = [RPPlaylistMenuDelegate new];
+    _playlistMenuDelegate.delegate = self;
+    _statusMenu = [[NSMenu alloc] initWithTitle:@"Status Menu"];
+    [_statusMenu setDelegate:_playlistMenuDelegate];
+}
+
+- (void)setupMediaKeysListening {
+    _mediaKeyTap = [[SPMediaKeyTap alloc] initWithDelegate:self];
+    if([SPMediaKeyTap usesGlobalMediaKeyTap]) {
+        [_mediaKeyTap startWatchingMediaKeys];
+    }  
+    else {
+        NSLog(@"Media key monitoring disabled");
+    }
+}
+
+- (void)setupSystemStatusItem {
+    NSStatusBar *statusBar = [NSStatusBar systemStatusBar];
+    _statusItem = [[statusBar statusItemWithLength:NSSquareStatusItemLength] retain];
+    NSImage *statusBarIcon = [NSImage imageNamed:@"app"];
+    [statusBarIcon setSize:NSMakeSize(16, 16)];
+    [_statusItem setImage:statusBarIcon];
+    [_statusItem setHighlightMode:YES];
+    [_statusItem setTarget:self];
+    [_statusItem setMenu:_statusMenu];
+}
+
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
 {
     if ([[SPSession sharedSession] attemptLoginWithStoredCredentials:nil]) {
@@ -97,39 +147,14 @@
     
     [[SPSession sharedSession] setDelegate:self];
     
-    NSBundle *currentBundle = [NSBundle bundleForClass:[repeatifyAppDelegate class]];
-    NSString *growlPath = [[currentBundle privateFrameworksPath]
-                           stringByAppendingPathComponent:@"Growl.framework"];
-    NSBundle *growlBundle = [NSBundle bundleWithPath:growlPath];
-    if (growlBundle && [growlBundle load]) {
-	[GrowlApplicationBridge setGrowlDelegate:self];
-    } else {
-	NSLog(@"Could not load Growl.framework");
-    }
-
-    _playlistMenuDelegate = [RPPlaylistMenuDelegate new];
-    _playlistMenuDelegate.delegate = self;
-    _statusMenu = [[NSMenu alloc] initWithTitle:@"Status Menu"];
-    [_statusMenu setDelegate:_playlistMenuDelegate];
+    [self setupGrowl];
+    [self setupMenus];
     
     self.playbackManager = [[RPPlaybackManager alloc] initWithPlaybackSession:[SPSession sharedSession]];
     self.topList = nil;
-    _mediaKeyTap = [[SPMediaKeyTap alloc] initWithDelegate:self];
-    if([SPMediaKeyTap usesGlobalMediaKeyTap]) {
-        [_mediaKeyTap startWatchingMediaKeys];
-    }  
-    else {
-        NSLog(@"Media key monitoring disabled");
-    }
     
-    NSStatusBar *statusBar = [NSStatusBar systemStatusBar];
-    _statusItem = [[statusBar statusItemWithLength:NSSquareStatusItemLength] retain];
-    NSImage *statusBarIcon = [NSImage imageNamed:@"app"];
-    [statusBarIcon setSize:NSMakeSize(16, 16)];
-    [_statusItem setImage:statusBarIcon];
-    [_statusItem setHighlightMode:YES];
-    [_statusItem setTarget:self];
-    [_statusItem setMenu:_statusMenu];
+    [self setupMediaKeysListening];
+    [self setupSystemStatusItem];
 }
 
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
