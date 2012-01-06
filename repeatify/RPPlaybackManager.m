@@ -49,6 +49,9 @@
 
 - (void)setCurrentRepeatifyMode:(RPRepeatMode)targetMode;
 
+- (void)fireGrowlNotification:(SPTrack *)track;
+- (void)triggerCoverLoading:(SPTrack *)track;
+
 @end
 
 @implementation RPPlaybackManager
@@ -86,33 +89,42 @@
 #pragma mark -
 #pragma mark Play Control
 
+- (void)fireGrowlNotification:(SPTrack *)track {
+    if ([self getCurrentRepeatMode] != RPRepeatOne && [[NSUserDefaults standardUserDefaults] boolForKey:@"RPGrowlNotification"]) {
+        [GrowlApplicationBridge notifyWithTitle:track.name
+                                    description:((SPArtist *)[track.artists objectAtIndex:0]).name
+                               notificationName:@"PlayTrack"
+                                       iconData:nil
+                                       priority:0
+                                       isSticky:NO
+                                   clickContext:[NSDate date]];
+    }
+}
+
+- (void)triggerCoverLoading:(SPTrack *)track {
+    SPImage *cover = track.album.cover;
+    if (!cover.isLoaded) {
+        [cover beginLoading];
+    }
+}
+
 - (void)play:(SPTrack *)track {
-    if (track != nil) {
-        if (!track.isLoaded) {
-            [self performSelector:@selector(play:) withObject:track afterDelay:0.5];
-            return;
-        }
-        
-        NSError *error = nil;
-        if (![self playTrack:track error:&error]) {
-            NSLog(@"error description %@", [error localizedDescription]);
-            return;
-        }
-        
-        if ([self getCurrentRepeatMode] != RPRepeatOne && [[NSUserDefaults standardUserDefaults] boolForKey:@"RPGrowlNotification"]) {
-            [GrowlApplicationBridge notifyWithTitle:track.name
-                                        description:((SPArtist *)[track.artists objectAtIndex:0]).name
-                                   notificationName:@"PlayTrack"
-                                           iconData:nil
-                                           priority:0
-                                           isSticky:NO
-                                       clickContext:[NSDate date]];
-        }
-        
-        SPImage *cover = track.album.cover;
-        if (!cover.isLoaded) {
-            [cover beginLoading];
-        }
+    if (track == nil) {
+        return;
+    }
+    
+    if (!track.isLoaded) {
+        [self performSelector:@selector(play:) withObject:track afterDelay:0.5];
+        return;
+    }
+    
+    NSError *error = nil;
+    if ([self playTrack:track error:&error]) {
+        [self fireGrowlNotification:track];
+        [self triggerCoverLoading:track];
+    }
+    else {
+        NSLog(@"error description %@", [error localizedDescription]);
     }
 }
 
@@ -124,8 +136,7 @@
 
 - (void)previous {
     if (self.trackPosition < 5.0) {
-        NSInteger index = [self.playQueue indexOfObject:self.currentTrack];
-        NSInteger previousIndex = index - 1;
+        NSInteger previousIndex = [self.playQueue indexOfObject:self.currentTrack] - 1;
         if (previousIndex == -1) {
             previousIndex = [self.playQueue count] - 1;
         }
