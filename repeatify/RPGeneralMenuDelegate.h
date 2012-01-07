@@ -16,12 +16,8 @@
 
 - (void)updateMenu:(NSMenu *)menu;
 
-- (void)addTracks:(NSArray *)tracks toMenuItem:(NSMenuItem *)menuItem;
 - (void)handleNowPlayingView:(NSMenu *)menu;
 - (void)handlePlaybackMenuItem:(NSMenu *)menu;
 - (void)handleAboutMenuItems:(NSMenu *)menu;
-- (NSArray *)getTracksFromPlaylistItems:(NSArray *)playlistItems;
-- (void)handlePlaylist:(SPPlaylist *)list menuItem:(NSMenuItem *)menuItem;
-- (void)handlePlaylistFolder:(SPPlaylistFolder *)folder menuItem:(NSMenuItem *)menuItem;
 
 @end

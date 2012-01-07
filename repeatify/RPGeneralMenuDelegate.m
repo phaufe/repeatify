@@ -8,6 +8,7 @@
 
 #import "RPGeneralMenuDelegate.h"
 #import "repeatifyAppDelegate.h"
+#import "RPPlaylistHelper.h"
 
 @interface RPGeneralMenuDelegate()
 
@@ -93,7 +94,7 @@
         
         NSMenuItem *playQueueMenuItem = [[NSMenuItem alloc] init];
         [playQueueMenuItem setTitle:@"Play Queue"];
-        [self addTracks:[self.delegate.playbackManager getCurrentPlayQueue] toMenuItem:playQueueMenuItem];
+        addTracks([self.delegate.playbackManager getCurrentPlayQueue], playQueueMenuItem);
         [playbackControlMenu addItem:playQueueMenuItem];
         [playQueueMenuItem release];
         
@@ -152,84 +153,6 @@
         
         [menu addItem:[NSMenuItem separatorItem]];
     }
-}
-
-- (void)addTracks:(NSArray *)tracks toMenuItem:(NSMenuItem *)menuItem {
-    NSMenu *innerMenu = [[NSMenu alloc] init];
-    [tracks each:^(SPTrack *track) {
-        if (track != nil) {
-            NSMenuItem *innerMenuItem;
-            if (track.name == nil) {
-                innerMenuItem = [[NSMenuItem alloc] initWithTitle:@"Loading Track..." action:nil keyEquivalent:@""];
-            }
-            else {
-                if (track.availability == SP_TRACK_AVAILABILITY_AVAILABLE) {
-                    innerMenuItem = [[NSMenuItem alloc] initWithTitle:track.name action:@selector(clickTrackMenuItem:) keyEquivalent:@""];
-                    
-                    if ([track isEqualTo:self.delegate.playbackManager.currentTrack]) {
-                        [innerMenuItem setState:NSOnState];
-                    }
-                    else {
-                        [innerMenuItem setState:NSOffState];
-                    }
-                }
-                else {
-                    innerMenuItem = [[NSMenuItem alloc] initWithTitle:track.name action:nil keyEquivalent:@""];
-                }
-            }
-            [innerMenuItem setRepresentedObject:[NSArray arrayWithObjects:track, tracks, nil]];
-            [innerMenu addItem:innerMenuItem];
-            [innerMenuItem release];
-        }
-    }];
-    [menuItem setSubmenu:innerMenu];
-    [innerMenu release];
-}
-
-- (void)handlePlaylistFolder:(SPPlaylistFolder *)folder menuItem:(NSMenuItem *)menuItem {
-    [menuItem setTitle:folder.name];
-    NSMenu *innerMenu = [[NSMenu alloc] init];
-    [folder.playlists each:^(id playlist) {
-        NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
-        
-        if ([playlist isKindOfClass:[SPPlaylistFolder class]]) {
-            [self handlePlaylistFolder:playlist menuItem:innerMenuItem];
-        }
-        else if ([playlist isKindOfClass:[SPPlaylist class]]) {
-            [self handlePlaylist:playlist menuItem:innerMenuItem];
-        }
-        
-        [innerMenu addItem:innerMenuItem];
-        [innerMenuItem release];
-    }];
-    
-    [menuItem setSubmenu:innerMenu];
-    [innerMenu release];
-}
-
-- (void)handlePlaylist:(SPPlaylist *)list menuItem:(NSMenuItem *)menuItem {
-    [menuItem setTitle:list.name];
-    [self addTracks:[self getTracksFromPlaylistItems:list.items] toMenuItem:menuItem];
-}
-
-- (NSArray *)getTracksFromPlaylistItems:(NSArray *)playlistItems {
-    NSMutableArray *tracks = [[NSMutableArray alloc] init];
-    [playlistItems each:^(id item) {
-        SPTrack *track = nil;
-        if ([item isKindOfClass:[SPPlaylistItem class]]) {
-            SPPlaylistItem *playlistItem = (SPPlaylistItem *)item;
-            if ([playlistItem.item isKindOfClass:[SPTrack class]]) {
-                track = (SPTrack *)playlistItem.item;
-            }
-        }
-        if ([item isKindOfClass:[SPTrack class]]) {
-            track = (SPTrack *)item;
-        }
-        if (track != nil) {
-            [tracks addObject:track];
-        }
-    }];
-    return [tracks autorelease];
 }
 
 #pragma mark -

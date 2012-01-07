@@ -8,6 +8,7 @@
 
 #import "RPPlaylistMenuDelegate.h"
 #import "repeatifyAppDelegate.h"
+#import "RPPlaylistHelper.h"
 
 @interface RPPlaylistMenuDelegate()
 
@@ -41,10 +42,10 @@
             NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
             
             if ([playlist isKindOfClass:[SPPlaylistFolder class]]) {
-                [self handlePlaylistFolder:playlist menuItem:innerMenuItem];
+                handlePlaylistFolder(playlist, innerMenuItem);
             }
             else if ([playlist isKindOfClass:[SPPlaylist class]]) {
-                [self handlePlaylist:playlist menuItem:innerMenuItem];
+                handlePlaylist(playlist, innerMenuItem);
             }
             
             [menu addItem:innerMenuItem];
@@ -65,7 +66,7 @@
 
 - (void)handleStarredPlaylist:(NSMenu *)menu {
     NSMenuItem *starredPlaylistItem = [[NSMenuItem alloc] init];
-    [self handlePlaylist:[[SPSession sharedSession] starredPlaylist] menuItem:starredPlaylistItem];
+    handlePlaylist([[SPSession sharedSession] starredPlaylist], starredPlaylistItem);
     [starredPlaylistItem setTitle:@"Starred"];
     [menu addItem:starredPlaylistItem];
     [starredPlaylistItem release];    
@@ -73,7 +74,7 @@
 
 - (void)handleInboxPlaylist:(NSMenu *)menu {
     NSMenuItem *inboxPlaylistItem = [[NSMenuItem alloc] init];
-    [self handlePlaylist:[[SPSession sharedSession] inboxPlaylist] menuItem:inboxPlaylistItem];
+    handlePlaylist([[SPSession sharedSession] inboxPlaylist], inboxPlaylistItem);
     [inboxPlaylistItem setTitle:@"Inbox"];
     [menu addItem:inboxPlaylistItem];
     [inboxPlaylistItem release];
@@ -85,7 +86,7 @@
         
         NSMenuItem *innerMenuItem = [[NSMenuItem alloc] init];
         [innerMenuItem setTitle:@"What's Hot"];
-        [self addTracks:self.delegate.topList.tracks toMenuItem:innerMenuItem];
+        addTracks(self.delegate.topList.tracks, innerMenuItem);
         [menu addItem:innerMenuItem];
         [innerMenuItem release];
     }
